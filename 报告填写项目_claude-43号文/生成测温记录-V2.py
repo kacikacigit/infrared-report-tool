@@ -6,6 +6,7 @@
 
 import os
 import re
+import sys
 import glob
 
 from docx import Document
@@ -15,7 +16,7 @@ from docx.oxml import OxmlElement
 
 # ===================== 配置 =====================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 REPORT_BASE = os.path.join(BASE_DIR, "测温报告_已生成")   # V2: 自动找最新
 TEMPLATE_PATH = os.path.join(BASE_DIR, "测温记录.docx")
 OUTPUT_BASE = os.path.join(BASE_DIR, "测温记录_已生成")   # V2: 自动编号
