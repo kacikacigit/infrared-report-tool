@@ -1,0 +1,43 @@
+name: 打包 Windows EXE
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装 Python 依赖
+        run: pip install -r requirements.txt
+
+      - name: 安装 Tesseract OCR
+        run: |
+          choco install tesseract --no-progress
+          echo "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: 打包 91号文脚本
+        run: |
+          pyinstaller --onefile --name "91号文报告自动生成" "报告填写项目-claude-91号文/终端版claude/91号文报告自动生成-终端版V4.py"
+
+      - name: 打包 43号文脚本
+        run: |
+          pyinstaller --onefile --name "43号文红外测温报告自动生成" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v5.py"
+
+      - name: 上传 EXE 文件
+        uses: actions/upload-artifact@v4
+        with:
+          name: 红外测温报告工具-Windows
+          path: |
+            dist/91号文报告自动生成.exe
+            dist/43号文红外测温报告自动生成.exe
