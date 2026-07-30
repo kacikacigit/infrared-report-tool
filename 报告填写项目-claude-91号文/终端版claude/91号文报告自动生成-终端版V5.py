@@ -68,7 +68,7 @@ if getattr(_sys, 'frozen', False):
 
 # ===================== 配置区域 =====================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
 
 IMAGE_DIR = os.path.join(BASE_DIR, "图谱")
 EXCEL_PATH = os.path.join(BASE_DIR, "必填信息.xlsx")
