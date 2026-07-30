@@ -30,14 +30,28 @@ jobs:
         run: |
           pyinstaller --onefile --name "91号文报告自动生成" "报告填写项目-claude-91号文/终端版claude/91号文报告自动生成-终端版V5.py"
 
+      - name: 下载 Tesseract 安装程序
+        run: |
+          curl -L -o dist/tesseract-ocr-w64-setup.exe "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-5.5.0.20241111.exe"
+          echo Tesseract installer downloaded
+
       - name: 打包 43号文脚本
         run: |
           pyinstaller --onefile --name "43号文红外测温报告自动生成" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v6.py"
 
-      - name: 上传 EXE 文件
+      - name: 组装分发包
+        run: |
+          mkdir dist\分发包\91号文
+          mkdir dist\分发包\43号文
+          copy dist\91号文报告自动生成.exe dist\分发包\91号文\
+          copy dist\43号文红外测温报告自动生成.exe dist\分发包\43号文\
+          copy dist\tesseract-ocr-w64-setup.exe dist\分发包\
+          copy 安装向导.bat dist\分发包\
+          echo Tesseract OCR安装程序：双击运行，务必勾选中文简体 > dist\分发包\安装前必读.txt
+          echo 装完后，进入91号文或43号文文件夹，双击exe即可使用 >> dist\分发包\安装前必读.txt
+
+      - name: 上传分发包
         uses: actions/upload-artifact@v4
         with:
           name: 红外测温报告工具-Windows
-          path: |
-            dist/91号文报告自动生成.exe
-            dist/43号文红外测温报告自动生成.exe
+          path: dist/分发包/**
