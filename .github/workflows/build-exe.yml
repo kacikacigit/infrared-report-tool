@@ -39,12 +39,17 @@ jobs:
         run: |
           pyinstaller --onefile --name "43号文红外测温报告自动生成" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v6.py"
 
+      - name: 打包 生成测温记录脚本
+        run: |
+          pyinstaller --onefile --name "生成测温记录" "报告填写项目_claude-43号文/生成测温记录-V2.py"
+
       - name: 组装分发包
         run: |
           mkdir dist\分发包\91号文
           mkdir dist\分发包\43号文
           copy dist\91号文报告自动生成.exe dist\分发包\91号文\
           copy dist\43号文红外测温报告自动生成.exe dist\分发包\43号文\
+          copy dist\生成测温记录.exe dist\分发包\43号文\
           copy dist\tesseract-ocr-w64-setup.exe dist\分发包\
           copy 安装向导.bat dist\分发包\
           echo Tesseract OCR安装程序：双击运行，务必勾选中文简体 > dist\分发包\安装前必读.txt
