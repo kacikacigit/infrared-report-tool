@@ -23,16 +23,12 @@ jobs:
 
       - name: 准备便携版 Tesseract OCR
         run: |
-          # 下载精简版 Tesseract 便携包（仅中英文，约12MB）
-          curl -L -o tesseract-portable.zip https://github.com/tesseract-ocr/tesseract/releases/download/5.5.0/tesseract-ocr-w64-setup-5.5.0.20241111.exe
-          # 用 7zip 解压 exe 安装包（免安装）
-          7z x tesseract-portable.zip -otesseract_install
-          # 提取需要的文件
+          choco install tesseract --no-progress
           mkdir tesseract
           mkdir tesseract\tessdata
-          copy tesseract_install\tesseract.exe tesseract\
-          copy tesseract_install\tessdata\eng.traineddata tesseract\tessdata\
-          copy tesseract_install\tessdata\chi_sim.traineddata tesseract\tessdata\
+          copy "C:\Program Files\Tesseract-OCR\tesseract.exe" tesseract\
+          copy "C:\Program Files\Tesseract-OCR\tessdata\eng.traineddata" tesseract\tessdata\
+          copy "C:\Program Files\Tesseract-OCR\tessdata\chi_sim.traineddata" tesseract\tessdata\
           echo Tesseract portable ready
 
       - name: 打包 91号文脚本
