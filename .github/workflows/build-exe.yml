@@ -22,25 +22,23 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: 准备内嵌 Tesseract 便携版
-        shell: cmd
+        shell: powershell
         run: |
           choco install tesseract --no-progress
-          mkdir tesseract\tessdata
-          if exist "C:\Program Files\Tesseract-OCR\tesseract.exe" (
-            copy "C:\Program Files\Tesseract-OCR\tesseract.exe" tesseract\
-            copy "C:\Program Files\Tesseract-OCR\tessdata\eng.traineddata" tesseract\tessdata\
-            copy "C:\Program Files\Tesseract-OCR\tessdata\chi_sim.traineddata" tesseract\tessdata\
-          ) else if exist "C:\Program Files (x86)\Tesseract-OCR\tesseract.exe" (
-            copy "C:\Program Files (x86)\Tesseract-OCR\tesseract.exe" tesseract\
-            copy "C:\Program Files (x86)\Tesseract-OCR\tessdata\eng.traineddata" tesseract\tessdata\
-            copy "C:\Program Files (x86)\Tesseract-OCR\tessdata\chi_sim.traineddata" tesseract\tessdata\
-          ) else (
-            echo ERROR: Cannot find tesseract.exe
-            dir /s "C:\Program Files\Tesseract-OCR\tesseract.exe"
-            dir /s "C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"
-            exit /b 1
-          )
-          if exist tesseract\tesseract.exe (echo Tesseract portable ready) else (echo Tesseract prep failed & exit /b 1)
+          $srcDir = "C:\Program Files\Tesseract-OCR"
+          if (-not (Test-Path "$srcDir\tesseract.exe")) { $srcDir = "C:\Program Files (x86)\Tesseract-OCR" }
+          mkdir tesseract\tessdata -Force
+          copy "$srcDir\tesseract.exe" tesseract\
+          copy "$srcDir\tessdata\eng.traineddata" tesseract\tessdata\
+          # 中文简体语言包可能不包含在 choco 安装中，单独下载
+          $chiSim = "$srcDir\tessdata\chi_sim.traineddata"
+          if (Test-Path $chiSim) {
+            copy $chiSim tesseract\tessdata\
+          } else {
+            Write-Host "chi_sim not in choco install, downloading..."
+            curl -L -o tesseract\tessdata\chi_sim.traineddata "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata"
+          }
+          if (Test-Path tesseract\tesseract.exe) { Write-Host "Tesseract portable ready" } else { throw "Tesseract prep failed" }
 
       - name: 打包 91号文脚本（内嵌 Tesseract）
         run: |
