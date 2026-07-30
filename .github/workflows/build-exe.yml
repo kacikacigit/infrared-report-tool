@@ -23,13 +23,22 @@ jobs:
 
       - name: 准备内嵌 Tesseract 便携版
         run: |
-          curl -L -o tesseract-setup.exe "https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe"
-          tesseract-setup.exe /SILENT /DIR=C:\tesseract_portable
-          mkdir tesseract\tessdata
-          copy "C:\tesseract_portable\tesseract.exe" tesseract\
-          copy "C:\tesseract_portable\tessdata\eng.traineddata" tesseract\tessdata\
-          copy "C:\tesseract_portable\tessdata\chi_sim.traineddata" tesseract\tessdata\
-          echo Tesseract portable ready (bundled into exe)
+          choco install tesseract --no-progress
+          # 定位实际安装路径
+          $tessExe = Get-ChildItem -Path "C:\Program Files" -Recurse -Filter tesseract.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $tessExe) { $tessExe = Get-ChildItem -Path "C:\Program Files (x86)" -Recurse -Filter tesseract.exe -ErrorAction SilentlyContinue | Select-Object -First 1 }
+          if ($tessExe) {
+            $tessDir = $tessExe.DirectoryName
+            mkdir tesseract\tessdata -Force
+            copy $tessExe.FullName tesseract\
+            copy "$tessDir\tessdata\eng.traineddata" tesseract\tessdata\
+            copy "$tessDir\tessdata\chi_sim.traineddata" tesseract\tessdata\
+            echo "Tesseract portable ready: $tessExe"
+          } else {
+            echo "ERROR: tesseract.exe not found"
+            Get-ChildItem "C:\Program Files\*esseract*" -Recurse -Depth 2 -ErrorAction SilentlyContinue
+            exit 1
+          }
 
       - name: 打包 91号文脚本（内嵌 Tesseract）
         run: |
