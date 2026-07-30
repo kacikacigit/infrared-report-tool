@@ -32,7 +32,7 @@ jobs:
 
       - name: 下载 Tesseract 安装程序
         run: |
-          curl -L -o dist/tesseract-ocr-w64-setup.exe "https://digi.bib.uni-mannheim.de/tesseract/tesseract-ocr-w64-setup-5.5.0.20241111.exe"
+          curl -L -o dist/tesseract-ocr-w64-setup.exe "https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe"
           echo Tesseract installer downloaded
 
       - name: 打包 43号文脚本
