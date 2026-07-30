@@ -36,7 +36,7 @@ jobs:
             copy $chiSim tesseract\tessdata\
           } else {
             Write-Host "chi_sim not in choco install, downloading..."
-            curl -L -o tesseract\tessdata\chi_sim.traineddata "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata"
+            Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata" -OutFile "tesseract\tessdata\chi_sim.traineddata"
           }
           if (Test-Path tesseract\tesseract.exe) { Write-Host "Tesseract portable ready" } else { throw "Tesseract prep failed" }
 
