@@ -21,23 +21,18 @@ jobs:
       - name: 安装 Python 依赖
         run: pip install -r requirements.txt
 
-      - name: 准备便携版 Tesseract OCR
+      - name: 安装 Tesseract OCR
         run: |
           choco install tesseract --no-progress
-          mkdir tesseract
-          mkdir tesseract\tessdata
-          copy "C:\Program Files\Tesseract-OCR\tesseract.exe" tesseract\
-          copy "C:\Program Files\Tesseract-OCR\tessdata\eng.traineddata" tesseract\tessdata\
-          copy "C:\Program Files\Tesseract-OCR\tessdata\chi_sim.traineddata" tesseract\tessdata\
-          echo Tesseract portable ready
+          echo "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Append
 
       - name: 打包 91号文脚本
         run: |
-          pyinstaller --onefile --name "91号文报告自动生成" --add-data "tesseract;tesseract" "报告填写项目-claude-91号文/终端版claude/91号文报告自动生成-终端版V5.py"
+          pyinstaller --onefile --name "91号文报告自动生成" "报告填写项目-claude-91号文/终端版claude/91号文报告自动生成-终端版V5.py"
 
       - name: 打包 43号文脚本
         run: |
-          pyinstaller --onefile --name "43号文红外测温报告自动生成" --add-data "tesseract;tesseract" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v6.py"
+          pyinstaller --onefile --name "43号文红外测温报告自动生成" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v6.py"
 
       - name: 上传 EXE 文件
         uses: actions/upload-artifact@v4
