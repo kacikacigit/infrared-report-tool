@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# 虚拟环境
+ocr_venv/
+venv/
+.venv/
+
+# 打包产物
+build/
+dist/
+*.spec
+
+# 输出文件（自动编号的生成结果）
+*_已生成*.xlsx
+*_已生成*.docx
+
+# 调试文件
+debug_crops*/
+debug_crops_91/
+
+# 模板里的敏感数据
+必填信息.xlsx
+91号文报告.docx
+测温报告.docx
+图谱/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# ROI 配置缓存
+roi_config_*.json
+
+# 大文件
+*.zip
+*.dmg
+*.pdf
+*.PNG
+*.png
+*.jpg
+*.JPG
+*.jpeg
+*.heic
