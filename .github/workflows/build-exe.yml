@@ -3,7 +3,7 @@ name: 打包 Windows EXE
 on:
   push:
     branches: [main, master]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
   build:
@@ -21,23 +21,23 @@ jobs:
       - name: 安装 Python 依赖
         run: pip install -r requirements.txt
 
-      - name: 安装 Tesseract OCR
+      - name: 准备内嵌 Tesseract 便携版
         run: |
-          choco install tesseract --no-progress
-          echo "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Append
+          curl -L -o tesseract-setup.exe "https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe"
+          tesseract-setup.exe /SILENT /DIR=C:\tesseract_portable
+          mkdir tesseract\tessdata
+          copy "C:\tesseract_portable\tesseract.exe" tesseract\
+          copy "C:\tesseract_portable\tessdata\eng.traineddata" tesseract\tessdata\
+          copy "C:\tesseract_portable\tessdata\chi_sim.traineddata" tesseract\tessdata\
+          echo Tesseract portable ready (bundled into exe)
 
-      - name: 打包 91号文脚本
+      - name: 打包 91号文脚本（内嵌 Tesseract）
         run: |
-          pyinstaller --onefile --name "91号文报告自动生成" "报告填写项目-claude-91号文/终端版claude/91号文报告自动生成-终端版V5.py"
+          pyinstaller --onefile --name "91号文报告自动生成" --add-data "tesseract;tesseract" "报告填写项目-claude-91号文/终端版claude/91号文报告自动生成-终端版V5.py"
 
-      - name: 下载 Tesseract 安装程序
+      - name: 打包 43号文脚本（内嵌 Tesseract）
         run: |
-          curl -L -o dist/tesseract-ocr-w64-setup.exe "https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe"
-          echo Tesseract installer downloaded
-
-      - name: 打包 43号文脚本
-        run: |
-          pyinstaller --onefile --name "43号文红外测温报告自动生成" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v6.py"
+          pyinstaller --onefile --name "43号文红外测温报告自动生成" --add-data "tesseract;tesseract" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v6.py"
 
       - name: 打包 生成测温记录脚本
         run: |
@@ -50,14 +50,13 @@ jobs:
           copy dist\91号文报告自动生成.exe dist\分发包\91号文\
           copy dist\43号文红外测温报告自动生成.exe dist\分发包\43号文\
           copy dist\生成测温记录.exe dist\分发包\43号文\
-          copy dist\tesseract-ocr-w64-setup.exe dist\分发包\
-          copy 安装向导.bat dist\分发包\
-          echo 第一步：安装Tesseract OCR引擎 > dist\分发包\安装前必读.txt
-          echo 如果 tesseract-ocr-w64-setup.exe 打不开或缺失，请从以下地址下载： >> dist\分发包\安装前必读.txt
-          echo https://github.com/tesseract-ocr/tesseract/releases >> dist\分发包\安装前必读.txt
-          echo 下载 tesseract-ocr-w64-setup-5.5.0.20241111.exe 安装时勾选中文简体 >> dist\分发包\安装前必读.txt
-          echo. >> dist\分发包\安装前必读.txt
-          echo 装完后，进入91号文或43号文文件夹，双击exe即可使用 >> dist\分发包\安装前必读.txt
+          echo 使用说明： > dist\分发包\使用说明.txt
+          echo 本工具已内嵌 Tesseract OCR，无需额外安装。 >> dist\分发包\使用说明.txt
+          echo 1. 将本文件夹拷贝到工作目录 >> dist\分发包\使用说明.txt
+          echo 2. 进入91号文或43号文文件夹 >> dist\分发包\使用说明.txt
+          echo 3. 放入红外图片到"图谱"文件夹 >> dist\分发包\使用说明.txt
+          echo 4. 填写"必填信息.xlsx" >> dist\分发包\使用说明.txt
+          echo 5. 双击 exe，按菜单选择操作 >> dist\分发包\使用说明.txt
 
       - name: 上传分发包
         uses: actions/upload-artifact@v4
