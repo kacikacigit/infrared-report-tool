@@ -21,18 +21,27 @@ jobs:
       - name: 安装 Python 依赖
         run: pip install -r requirements.txt
 
-      - name: 安装 Tesseract OCR
+      - name: 准备便携版 Tesseract OCR
         run: |
-          choco install tesseract --no-progress
-          echo "C:\Program Files\Tesseract-OCR" | Out-File -FilePath $env:GITHUB_PATH -Append
+          # 下载精简版 Tesseract 便携包（仅中英文，约12MB）
+          curl -L -o tesseract-portable.zip https://github.com/tesseract-ocr/tesseract/releases/download/5.5.0/tesseract-ocr-w64-setup-5.5.0.20241111.exe
+          # 用 7zip 解压 exe 安装包（免安装）
+          7z x tesseract-portable.zip -otesseract_install
+          # 提取需要的文件
+          mkdir tesseract
+          mkdir tesseract\tessdata
+          copy tesseract_install\tesseract.exe tesseract\
+          copy tesseract_install\tessdata\eng.traineddata tesseract\tessdata\
+          copy tesseract_install\tessdata\chi_sim.traineddata tesseract\tessdata\
+          echo Tesseract portable ready
 
       - name: 打包 91号文脚本
         run: |
-          pyinstaller --onefile --name "91号文报告自动生成" "报告填写项目-claude-91号文/终端版claude/91号文报告自动生成-终端版V4.py"
+          pyinstaller --onefile --name "91号文报告自动生成" --add-data "tesseract;tesseract" "报告填写项目-claude-91号文/终端版claude/91号文报告自动生成-终端版V5.py"
 
       - name: 打包 43号文脚本
         run: |
-          pyinstaller --onefile --name "43号文红外测温报告自动生成" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v5.py"
+          pyinstaller --onefile --name "43号文红外测温报告自动生成" --add-data "tesseract;tesseract" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v6.py"
 
       - name: 上传 EXE 文件
         uses: actions/upload-artifact@v4
