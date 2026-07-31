@@ -56,8 +56,8 @@ jobs:
           copy dist\91号文报告自动生成.exe dist\分发包\91号文\
           copy dist\43号文红外测温报告自动生成.exe dist\分发包\43号文\
           copy dist\生成测温记录.exe dist\分发包\43号文\
-          xcopy tesseract dist\分发包\91号文\tesseract\ /E /I /Y
-          xcopy tesseract dist\分发包\43号文\tesseract\ /E /I /Y
+          xcopy tesseract dist\分发包\91号文\tesseract\ /E /I /Y >nul 2>&1 || (echo 91号文 tesseract copy failed & exit /b 1)
+          xcopy tesseract dist\分发包\43号文\tesseract\ /E /I /Y >nul 2>&1 || (echo 43号文 tesseract copy failed & exit /b 1)
           echo 使用说明： > dist\分发包\使用说明.txt
           echo 本工具已内置 Tesseract OCR 引擎，无需额外安装任何软件。 >> dist\分发包\使用说明.txt
           echo 进入 91号文 或 43号文 文件夹，放入图谱和模板文件，双击 exe 即可使用。 >> dist\分发包\使用说明.txt
