@@ -1218,8 +1218,8 @@ def main():
     excel_output_path = resolve_output_path(EXCEL_OUTPUT_BASE, "xlsx", suffix)
     docx_output_path = resolve_output_path(DOCX_OUTPUT_BASE, "docx", suffix)
 
-    # ---------- tkinter 预初始化（必须在 OpenCV 窗口之前，避免 macOS Cocoa 冲突）----------
-    if USE_GUI and run_step1:
+    # ---------- tkinter 预初始化（仅 macOS 需要，Windows 上反而会破坏 Tcl 解释器）----------
+    if USE_GUI and run_step1 and platform.system() == "Darwin":
         try:
             import tkinter as tk
             _pre = tk.Tk()

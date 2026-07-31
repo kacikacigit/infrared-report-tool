@@ -1265,8 +1265,8 @@ def main():
         run_step1, run_step2 = interactive_menu()
         suffix = None
 
-    # ---------- GUI 预初始化 ----------
-    if USE_GUI and run_step1:
+    # ---------- GUI 预初始化（仅 macOS 需要，Windows 上反而会破坏 Tcl 解释器）----------
+    if USE_GUI and run_step1 and platform.system() == "Darwin":
         try:
             import tkinter as tk
             _pre = tk.Tk()
