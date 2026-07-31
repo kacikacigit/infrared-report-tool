@@ -47,10 +47,10 @@ jobs:
           copy dist\tesseract-ocr-w64-setup.exe dist\分发包\
           copy 安装向导.bat dist\分发包\
           echo === 红外测温报告工具 - 使用说明 === > dist\分发包\使用说明.txt
-          echo. >> dist\分发包\使用说明.txt
+          echo "" >> dist\分发包\使用说明.txt
           echo 第一步（仅首次）：双击 tesseract-ocr-w64-setup.exe 安装 OCR 引擎 >> dist\分发包\使用说明.txt
           echo   安装时务必勾选 Additional language data - Chinese Simplified >> dist\分发包\使用说明.txt
-          echo. >> dist\分发包\使用说明.txt
+          echo "" >> dist\分发包\使用说明.txt
           echo 第二步：进入 91号文 或 43号文 文件夹 >> dist\分发包\使用说明.txt
           echo   放入红外图片到"图谱"文件夹 >> dist\分发包\使用说明.txt
           echo   填写"必填信息.xlsx" >> dist\分发包\使用说明.txt
