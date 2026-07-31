@@ -21,40 +21,21 @@ jobs:
       - name: 安装 Python 依赖
         run: pip install -r requirements.txt
 
-      - name: 准备内嵌 Tesseract 便携版
-        shell: powershell
+      - name: 打包 91号文脚本
         run: |
-          choco install tesseract --no-progress
-          $srcDir = "C:\Program Files\Tesseract-OCR"
-          if (-not (Test-Path "$srcDir\tesseract.exe")) { $srcDir = "C:\Program Files (x86)\Tesseract-OCR" }
-          mkdir tesseract\tessdata -Force
-          # 拷贝所有必需文件（exe + dll + 语言包）
-          copy "$srcDir\*.exe" tesseract\
-          copy "$srcDir\*.dll" tesseract\
-          copy "$srcDir\tessdata\eng.traineddata" tesseract\tessdata\
-          copy "$srcDir\tessdata\chi_sim.traineddata" tesseract\tessdata\ -ErrorAction SilentlyContinue
-          # 如果 choco 不含中文简体，单独下载
-          if (-not (Test-Path "tesseract\tessdata\chi_sim.traineddata")) {
-            Write-Host "chi_sim not in choco install, downloading..."
-            Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata" -OutFile "tesseract\tessdata\chi_sim.traineddata"
-          }
-          # 移除与 PyInstaller 冲突的 libstdc++（让 PyInstaller 的版本优先）
-          Remove-Item "tesseract\libstdc++-6.dll" -ErrorAction SilentlyContinue
-          Write-Host "Tesseract files:"
-          Get-ChildItem tesseract\ | Select-Object Name
-          if (Test-Path tesseract\tesseract.exe) { Write-Host "Tesseract portable ready" } else { throw "Tesseract prep failed" }
+          pyinstaller --onefile --name "91号文报告自动生成" "报告填写项目-claude-91号文/终端版claude/91号文报告自动生成-终端版V5.py"
 
-      - name: 打包 91号文脚本（内嵌 Tesseract）
+      - name: 打包 43号文脚本
         run: |
-          pyinstaller --onefile --name "91号文报告自动生成" --add-data "tesseract;tesseract" "报告填写项目-claude-91号文/终端版claude/91号文报告自动生成-终端版V5.py"
-
-      - name: 打包 43号文脚本（内嵌 Tesseract）
-        run: |
-          pyinstaller --onefile --name "43号文红外测温报告自动生成" --add-data "tesseract;tesseract" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v6.py"
+          pyinstaller --onefile --name "43号文红外测温报告自动生成" "报告填写项目_claude-43号文/43号文报告自动生成-claude-v6.py"
 
       - name: 打包 生成测温记录脚本
         run: |
           pyinstaller --onefile --name "生成测温记录" "报告填写项目_claude-43号文/生成测温记录-V2.py"
+
+      - name: 下载 Tesseract 安装程序
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe" -OutFile "dist\tesseract-ocr-w64-setup.exe"
 
       - name: 组装分发包
         run: |
@@ -63,13 +44,18 @@ jobs:
           copy dist\91号文报告自动生成.exe dist\分发包\91号文\
           copy dist\43号文红外测温报告自动生成.exe dist\分发包\43号文\
           copy dist\生成测温记录.exe dist\分发包\43号文\
-          echo 使用说明： > dist\分发包\使用说明.txt
-          echo 本工具已内嵌 Tesseract OCR，无需额外安装。 >> dist\分发包\使用说明.txt
-          echo 1. 将本文件夹拷贝到工作目录 >> dist\分发包\使用说明.txt
-          echo 2. 进入91号文或43号文文件夹 >> dist\分发包\使用说明.txt
-          echo 3. 放入红外图片到"图谱"文件夹 >> dist\分发包\使用说明.txt
-          echo 4. 填写"必填信息.xlsx" >> dist\分发包\使用说明.txt
-          echo 5. 双击 exe，按菜单选择操作 >> dist\分发包\使用说明.txt
+          copy dist\tesseract-ocr-w64-setup.exe dist\分发包\
+          copy 安装向导.bat dist\分发包\
+          echo === 红外测温报告工具 - 使用说明 === > dist\分发包\使用说明.txt
+          echo. >> dist\分发包\使用说明.txt
+          echo 第一步（仅首次）：双击 tesseract-ocr-w64-setup.exe 安装 OCR 引擎 >> dist\分发包\使用说明.txt
+          echo   安装时务必勾选 Additional language data - Chinese Simplified >> dist\分发包\使用说明.txt
+          echo. >> dist\分发包\使用说明.txt
+          echo 第二步：进入 91号文 或 43号文 文件夹 >> dist\分发包\使用说明.txt
+          echo   放入红外图片到"图谱"文件夹 >> dist\分发包\使用说明.txt
+          echo   填写"必填信息.xlsx" >> dist\分发包\使用说明.txt
+          echo   放入对应的 Word 模板文件 >> dist\分发包\使用说明.txt
+          echo   双击 exe，按菜单选择操作 >> dist\分发包\使用说明.txt
 
       - name: 上传分发包
         uses: actions/upload-artifact@v4
