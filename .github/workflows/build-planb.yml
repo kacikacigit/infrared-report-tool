@@ -1,0 +1,69 @@
+name: 打包 PlanB 分路径版
+
+on:
+  push:
+    paths:
+      - 'PlanB_分路径/**'
+      - '.github/workflows/build-planb.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装 Python 依赖
+        run: pip install -r requirements.txt
+
+      - name: 准备 Tesseract 便携版
+        shell: powershell
+        run: |
+          choco install tesseract --no-progress
+          $srcDir = "C:\Program Files\Tesseract-OCR"
+          if (-not (Test-Path "$srcDir\tesseract.exe")) { $srcDir = "C:\Program Files (x86)\Tesseract-OCR" }
+          mkdir tesseract\tessdata -Force
+          copy "$srcDir\*.exe" tesseract\
+          copy "$srcDir\*.dll" tesseract\
+          copy "$srcDir\tessdata\eng.traineddata" tesseract\tessdata\
+          copy "$srcDir\tessdata\chi_sim.traineddata" tesseract\tessdata\ -ErrorAction SilentlyContinue
+          if (-not (Test-Path "tesseract\tessdata\chi_sim.traineddata")) {
+            Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata" -OutFile "tesseract\tessdata\chi_sim.traineddata"
+          }
+          Write-Host "Tesseract portable ready"
+
+      - name: 打包 PlanB-91号文
+        run: |
+          pyinstaller --onefile --name "91号文报告自动生成" "PlanB_分路径/Document_91/1_program/91号文红外测温报告自动生成.py"
+
+      - name: 打包 PlanB-43号文
+        run: |
+          pyinstaller --onefile --name "43号文红外测温报告自动生成" "PlanB_分路径/Document_43/1_program/43号文红外测温报告自动生成.py"
+
+      - name: 打包 PlanB-测温记录
+        run: |
+          pyinstaller --onefile --name "生成测温记录" "PlanB_分路径/Document_43/1_program/测温记录自动生成.py"
+
+      - name: 组装分发包
+        shell: cmd
+        run: |
+          mkdir dist\PlanB\Document_91\1_program
+          mkdir dist\PlanB\Document_43\1_program
+          copy dist\91号文报告自动生成.exe dist\PlanB\Document_91\1_program\
+          copy dist\43号文红外测温报告自动生成.exe dist\PlanB\Document_43\1_program\
+          copy dist\生成测温记录.exe dist\PlanB\Document_43\1_program\
+          xcopy tesseract dist\PlanB\Document_91\1_program\tesseract\ /E /I /Y
+          xcopy tesseract dist\PlanB\Document_43\1_program\tesseract\ /E /I /Y
+
+      - name: 上传分发包
+        uses: actions/upload-artifact@v4
+        with:
+          name: PlanB-分路径版
+          path: dist/PlanB/**
