@@ -63,8 +63,13 @@ from docx.oxml import OxmlElement
 import sys as _sys
 if getattr(_sys, 'frozen', False):
     _base = _sys._MEIPASS
-    _tesseract_exe = os.path.join(_base, 'tesseract', 'tesseract.exe')
+    _tesseract_dir = os.path.join(_base, 'tesseract')
+    _tesseract_exe = os.path.join(_tesseract_dir, 'tesseract.exe')
     if os.path.exists(_tesseract_exe):
+        # 添加 DLL 搜索路径，确保 tesseract.exe 能找到依赖的 dll
+        if hasattr(os, 'add_dll_directory'):
+            os.add_dll_directory(_tesseract_dir)
+        os.environ['PATH'] = _tesseract_dir + os.pathsep + os.environ.get('PATH', '')
         pytesseract.pytesseract.tesseract_cmd = _tesseract_exe
 
 # ===================== 配置区域 =====================

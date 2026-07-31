@@ -28,16 +28,20 @@ jobs:
           $srcDir = "C:\Program Files\Tesseract-OCR"
           if (-not (Test-Path "$srcDir\tesseract.exe")) { $srcDir = "C:\Program Files (x86)\Tesseract-OCR" }
           mkdir tesseract\tessdata -Force
-          copy "$srcDir\tesseract.exe" tesseract\
+          # 拷贝所有必需文件（exe + dll + 语言包）
+          copy "$srcDir\*.exe" tesseract\
+          copy "$srcDir\*.dll" tesseract\
           copy "$srcDir\tessdata\eng.traineddata" tesseract\tessdata\
-          # 中文简体语言包可能不包含在 choco 安装中，单独下载
-          $chiSim = "$srcDir\tessdata\chi_sim.traineddata"
-          if (Test-Path $chiSim) {
-            copy $chiSim tesseract\tessdata\
-          } else {
+          copy "$srcDir\tessdata\chi_sim.traineddata" tesseract\tessdata\ -ErrorAction SilentlyContinue
+          # 如果 choco 不含中文简体，单独下载
+          if (-not (Test-Path "tesseract\tessdata\chi_sim.traineddata")) {
             Write-Host "chi_sim not in choco install, downloading..."
             Invoke-WebRequest -Uri "https://github.com/tesseract-ocr/tessdata/raw/main/chi_sim.traineddata" -OutFile "tesseract\tessdata\chi_sim.traineddata"
           }
+          # 移除与 PyInstaller 冲突的 libstdc++（让 PyInstaller 的版本优先）
+          Remove-Item "tesseract\libstdc++-6.dll" -ErrorAction SilentlyContinue
+          Write-Host "Tesseract files:"
+          Get-ChildItem tesseract\ | Select-Object Name
           if (Test-Path tesseract\tesseract.exe) { Write-Host "Tesseract portable ready" } else { throw "Tesseract prep failed" }
 
       - name: 打包 91号文脚本（内嵌 Tesseract）
