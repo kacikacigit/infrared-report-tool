@@ -70,6 +70,7 @@ if os.path.exists(_tesseract_exe):
     if hasattr(os, 'add_dll_directory'):
         os.add_dll_directory(_tesseract_dir)
     os.environ['PATH'] = _tesseract_dir + os.pathsep + os.environ.get('PATH', '')
+    os.environ['TESSDATA_PREFIX'] = os.path.join(_tesseract_dir, 'tessdata')
     pytesseract.pytesseract.tesseract_cmd = _tesseract_exe
 
 # ===================== 配置区域 =====================
