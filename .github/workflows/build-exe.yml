@@ -50,6 +50,7 @@ jobs:
           pyinstaller --onefile --name "生成测温记录" "报告填写项目_claude-43号文/生成测温记录-V2.py"
 
       - name: 组装分发包
+        shell: cmd
         run: |
           mkdir dist\分发包\91号文
           mkdir dist\分发包\43号文
