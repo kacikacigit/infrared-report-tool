@@ -961,6 +961,17 @@ def apply_font_to_whole_document(doc):
         apply_font_to_table(t)
 
 
+def visual_cells(row):
+    """按底层XML元素身份去重（正确识别真实的合并单元格），返回去重后的Cell对象列表。"""
+    result = []
+    last_tc = None
+    for cell in row.cells:
+        if cell._tc is not last_tc:
+            result.append(cell)
+            last_tc = cell._tc
+    return result
+
+
 def find_row_by_first_cell_text(table, target_text):
     for row in table.rows:
         if row.cells[0].text.strip() == target_text:
@@ -1058,7 +1069,7 @@ def step3_fill_word_data_table(doc, full_data):
             row_data['atlas_code'],
             row_data['remark'],
         ]
-        for cell, val in zip(row_obj.cells, values):
+        for cell, val in zip(visual_cells(row_obj), values):
             set_cell_text(cell, val)
 
     # 填写结论：table中"结论"所在行的第4~10列（索引3~9）
