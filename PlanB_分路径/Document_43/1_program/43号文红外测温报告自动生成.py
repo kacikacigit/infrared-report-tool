@@ -810,8 +810,11 @@ def step1_ocr_and_review(excel_output_path):
     env_temp_doc = Document(DOCX_TEMPLATE_PATH)
     try:
         env_temp_text = env_temp_doc.tables[0].rows[4].cells[4].text.strip()
-        env_temp_val = float(env_temp_text) if env_temp_text else None
-        print(f"\n从测温报告模板读取环境温度: {env_temp_text}")
+        # 保留原始文本，去除可能的"℃"后缀，避免 float 转换后变成 31.0 而非 31
+        env_temp_display = env_temp_text.replace("℃", "").strip()
+        float(env_temp_display)  # 仅验证是否为有效数字
+        env_temp_val = env_temp_display
+        print(f"\n从测温报告模板读取环境温度: {env_temp_display}")
     except (ValueError, IndexError, AttributeError) as e:
         print(f"\n警告：从测温报告读取环境温度失败（{e}），G列将留空。")
         env_temp_val = None
@@ -846,6 +849,7 @@ def step1_ocr_and_review(excel_output_path):
         row_data = dict(info)
         row_data['surface_temp'] = surface_temp.get(r)
         row_data['normal_temp'], row_data['diff'] = calc_result[r]
+        row_data['env_temp'] = env_temp_val  # 补到内存中，确保串行模式 step2 也能获取
         full_data.append(row_data)
 
     return full_data
