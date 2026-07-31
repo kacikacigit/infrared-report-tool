@@ -160,8 +160,14 @@ def open_image_for_preview(image_path):
 
 # ===================== ROI框选 =====================
 
+def imread_unicode(path):
+    """cv2.imread 的 Unicode 安全替代（Windows 中文路径兼容）。"""
+    img_array = np.fromfile(path, dtype=np.uint8)
+    return cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+
 def select_roi_interactively(sample_image_path, window_title):
-    img = cv2.imread(sample_image_path)
+    img = imread_unicode(sample_image_path)
     if img is None:
         raise FileNotFoundError(f"无法读取示例图片: {sample_image_path}")
     img_h, img_w = img.shape[:2]
@@ -320,7 +326,7 @@ def extract_number(text):
 
 
 def ocr_ar1_temperature(image_path, roi_ratio):
-    img = cv2.imread(image_path)
+    img = imread_unicode(image_path)
     if img is None:
         return None, None, ["[无法读取图片]"]
     crop = crop_by_relative_roi(img, roi_ratio)
@@ -396,7 +402,7 @@ _OCR_CONFIGS_DATE_TIME = [
 
 
 def ocr_datetime(image_path, roi_ratio):
-    img = cv2.imread(image_path)
+    img = imread_unicode(image_path)
     if img is None:
         return None, None, None, ["[无法读取图片]"]
     crop = crop_by_relative_roi(img, roi_ratio)
