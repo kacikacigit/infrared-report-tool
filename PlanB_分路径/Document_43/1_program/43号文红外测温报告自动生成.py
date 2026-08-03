@@ -52,7 +52,7 @@ import cv2
 import numpy as np
 import pytesseract
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+
 
 from docx import Document
 from docx.shared import Cm
@@ -67,7 +67,7 @@ REPORT_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "2_report"))  # 模板
 IMAGE_DIR = os.path.join(REPORT_DIR, "图谱")
 EXCEL_PATH = os.path.join(REPORT_DIR, "43号文必填信息.xlsx")
 EXCEL_OUTPUT_BASE = os.path.join(REPORT_DIR, "必填信息_已生成")  # 自动编号
-EXCEL_SHEET_NAME = "普测"
+# 自动读取第一个 sheet（不按名称，按位置）
 
 DOCX_TEMPLATE_PATH = os.path.join(REPORT_DIR, "43号文测温报告.docx")
 DOCX_OUTPUT_BASE = os.path.join(REPORT_DIR, "测温报告_已生成")
@@ -97,10 +97,6 @@ NOT_RECOGNIZED_TEXT = "无法识别"
 
 # 发热判定阈值：温差 > 该值 视为发热对象
 HOT_THRESHOLD = 15
-
-# 人工核对相关：L列放调试图片超链接；"无法识别"的单元格用红色底色高亮
-DEBUG_LINK_COLUMN = 12  # L列
-RED_FILL = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
 
 # 结论模板
 CONCLUSION_TEMPLATE = "{names}发热,达到一般缺陷标准,未达到严重缺陷标准（发热缺陷较前期无明显发展趋势），无其他异常。"
@@ -515,33 +511,6 @@ def find_header_row(ws, keyword="序号", max_scan_rows=10):
     return 1
 
 
-def write_review_helpers(ws, header_row_idx, data_rows_info, surface_temp, debug_file_map):
-    """写入L列调试图片超链接，并把仍然'无法识别'的E列单元格标红（供事后复查留档用）。"""
-    header_cell = ws.cell(row=header_row_idx, column=DEBUG_LINK_COLUMN)
-    if not header_cell.value:
-        header_cell.value = "调试图片（点击核对）"
-
-    debug_rel_dir = os.path.relpath(DEBUG_DIR, BASE_DIR)
-
-    for info in data_rows_info:
-        r = info['row']
-        e_cell = ws.cell(row=r, column=5)
-
-        if surface_temp.get(r) is None:
-            e_cell.fill = RED_FILL
-        else:
-            e_cell.fill = PatternFill(fill_type=None)
-
-        link_cell = ws.cell(row=r, column=DEBUG_LINK_COLUMN)
-        debug_name = debug_file_map.get(r)
-        if debug_name:
-            rel_path = os.path.join(debug_rel_dir, debug_name)
-            link_cell.value = "查看裁剪图"
-            link_cell.hyperlink = rel_path
-            link_cell.style = "Hyperlink"
-        else:
-            link_cell.value = "（无对应图片）"
-
 
 def open_image_for_preview(image_path):
     """用系统默认图片查看器打开图片（Mac用'预览'，Windows/Linux也做了兼容）。"""
@@ -765,12 +734,10 @@ def step1_ocr_and_review(excel_output_path):
     print("  Step 1: OCR识别 + 人工核对 + 写入Excel")
     print(f"{'=' * 50}\n")
 
-    print(f"正在读取Excel模板: {EXCEL_PATH}  (工作表: {EXCEL_SHEET_NAME})")
     wb = load_workbook(EXCEL_PATH)
-    if EXCEL_SHEET_NAME not in wb.sheetnames:
-        print(f"错误：Excel中找不到名为'{EXCEL_SHEET_NAME}'的工作表。")
-        sys.exit(1)
-    ws = wb[EXCEL_SHEET_NAME]
+    sheet_name = wb.sheetnames[0]
+    print(f"正在读取Excel模板: {EXCEL_PATH}  (工作表: {sheet_name})")
+    ws = wb[sheet_name]
 
     header_row_idx = find_header_row(ws)
     data_rows_info = read_excel_data_rows(ws, header_row_idx)
@@ -827,18 +794,10 @@ def step1_ocr_and_review(excel_output_path):
     # 第五步：计算正常温度(F)和温差(K)
     calc_result = compute_normal_temperature_and_diff(data_rows_info, surface_temp)
 
-    k_header = ws.cell(row=header_row_idx, column=11).value
-    if not k_header:
-        ws.cell(row=header_row_idx, column=11).value = "温差（℃）"
-
     for info in data_rows_info:
         r = info['row']
         normal_temp, diff = calc_result[r]
         ws.cell(row=r, column=6).value = normal_temp
-        ws.cell(row=r, column=11).value = diff
-
-    # 留档：L列超链接 + 仍未识别的行标红，方便事后复查
-    write_review_helpers(ws, header_row_idx, data_rows_info, surface_temp, debug_file_map)
 
     wb.save(excel_output_path)
     print(f"\nExcel已生成: {excel_output_path}")
@@ -869,10 +828,8 @@ def read_excel_output(excel_output_path=None):
     print(f"\n自动读取最新 Excel: {os.path.basename(excel_output_path)}")
 
     wb = load_workbook(excel_output_path)
-    if EXCEL_SHEET_NAME not in wb.sheetnames:
-        print(f"错误：工作表中找不到 '{EXCEL_SHEET_NAME}'。")
-        sys.exit(1)
-    ws = wb[EXCEL_SHEET_NAME]
+    sheet_name = wb.sheetnames[0]
+    ws = wb[sheet_name]
 
     header_row_idx = find_header_row(ws)
     data_rows_info = read_excel_data_rows(ws, header_row_idx)
@@ -885,19 +842,10 @@ def read_excel_output(excel_output_path=None):
         r = info['row']
         e_val = ws.cell(row=r, column=5).value   # 表面温度
         f_val = ws.cell(row=r, column=6).value   # 正常温度
-        k_val = ws.cell(row=r, column=11).value  # 温差
-
-        surface_temp = e_val if e_val != NOT_RECOGNIZED_TEXT else None
-        # 尝试转为 float
-        try:
-            surface_temp = float(surface_temp) if surface_temp is not None else None
-        except (ValueError, TypeError):
-            surface_temp = surface_temp
 
         row_data = dict(info)
-        row_data['surface_temp'] = surface_temp
+        row_data['surface_temp'] = e_val if e_val != NOT_RECOGNIZED_TEXT else None
         row_data['normal_temp'] = f_val
-        row_data['diff'] = k_val
         full_data.append(row_data)
 
     print(f"  共读取 {len(full_data)} 行数据。")

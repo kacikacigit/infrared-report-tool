@@ -67,7 +67,7 @@ REPORT_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "2_report"))  # PlanB:
 IMAGE_DIR = os.path.join(REPORT_DIR, "图谱")
 EXCEL_PATH = os.path.join(REPORT_DIR, "91号文必填信息.xlsx")
 EXCEL_OUTPUT_BASE = os.path.join(REPORT_DIR, "必填信息_已生成")
-EXCEL_SHEET_NAME = "91号文模板"
+# 自动读取第一个 sheet（不按名称，按位置）
 
 DOCX_TEMPLATE_PATH = os.path.join(REPORT_DIR, "91号文测温报告.docx")
 DOCX_OUTPUT_BASE = os.path.join(REPORT_DIR, "测温报告_已生成")
@@ -478,10 +478,8 @@ def read_excel_output(excel_output_path=None):
 
     print(f"正在从 {excel_output_path} 读取已核对的识别结果...")
     wb = load_workbook(excel_output_path)
-    if EXCEL_SHEET_NAME not in wb.sheetnames:
-        print(f"错误：工作表中找不到 '{EXCEL_SHEET_NAME}'。")
-        sys.exit(1)
-    ws = wb[EXCEL_SHEET_NAME]
+    sheet_name = wb.sheetnames[0]
+    ws = wb[sheet_name]
 
     header_row_idx = find_header_row(ws)
     data_rows_info = read_excel_data_rows(ws, header_row_idx)
@@ -877,12 +875,10 @@ def step1_recognize_and_review(excel_output_path):
     print("  Step 1: OCR识别 + 人工核对 + 写入Excel")
     print(f"{'=' * 50}\n")
 
-    print(f"正在读取Excel模板: {EXCEL_PATH}  (工作表: {EXCEL_SHEET_NAME})")
     wb = load_workbook(EXCEL_PATH)
-    if EXCEL_SHEET_NAME not in wb.sheetnames:
-        print(f"错误：Excel中找不到名为'{EXCEL_SHEET_NAME}'的工作表。")
-        sys.exit(1)
-    ws = wb[EXCEL_SHEET_NAME]
+    sheet_name = wb.sheetnames[0]
+    print(f"正在读取Excel模板: {EXCEL_PATH}  (工作表: {sheet_name})")
+    ws = wb[sheet_name]
 
     header_row_idx = find_header_row(ws)
     data_rows_info = read_excel_data_rows(ws, header_row_idx)
