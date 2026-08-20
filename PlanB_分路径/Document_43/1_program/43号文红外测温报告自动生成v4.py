@@ -637,7 +637,9 @@ def step1_ocr_fill_surface_temperature(ws, header_row_idx, data_rows_info):
 
         debug_file_map[row] = None
         if SAVE_DEBUG_CROPS and raw_crop is not None:
-            debug_name = f"row{row}_{status}.png"
+            # 用 ASCII 文件名，避免 Windows 上 cv2.imwrite 写中文文件名（"无法识别"）失败
+            debug_tag = value if value is not None else "failed"
+            debug_name = f"row{row}_{debug_tag}.png"
             debug_name = re.sub(r'[\\/:*?"<>|]', "_", debug_name)
             # 保存"原始彩色裁剪图"（放大2倍方便肉眼看清），而不是二值化后的调试图，
             # 这样人工核对时看到的和图片本身长得一样，不容易被二值化处理误导。
