@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-91号文《红外精确测温报告》自动生成程序 V5
+91号文《红外精确测温报告》自动生成程序 V6
 ======================================================
+
+V6 新增功能：
+  1. 温度框不固定自动定位：运行时询问"是否温度框不固定？"，选 y 则
+     OCR 整图找到"最高温"的"温"字位置，裁剪其右侧数值区域再局部 OCR，
+     Ar1 温度位置每张图不同也能提取；选 n 则沿用之前的手动框选流程。
 
 V5 新增功能：
   1. PyInstaller 打包支持：exe 内嵌便携版 Tesseract OCR，用户无需安装任何依赖
@@ -80,6 +85,16 @@ SAVE_DEBUG_CROPS = True
 
 NOT_RECOGNIZED_TEXT = "无法识别"
 NO_TIME_TEXT = "无时间信息"  # 图片上无时间时用此标识，区别于OCR识别失败
+
+# 自动定位"最高温"的标记字符（OCR 可能把"最高温"拆成多个片段，按优先级找）
+MARKER_KEYWORDS = ("温", "最高", "高")
+
+# 兜底标记：R01/R02/R03 等测量点编号（OCR 中 O 可能是字母也可能是数字 0，都覆盖）
+ASCII_MARKERS = (
+    "R01", "R02", "R03", "R04", "R05", "R06", "R07", "R08", "R09", "R10",
+    "RO1", "RO2", "RO3", "RO4", "RO5",
+    "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R0", "RO",
+)
 
 # GUI核对开关（--cli 参数可强制使用命令行模式）
 USE_GUI = True
@@ -550,6 +565,19 @@ def _load_image_into(label, path, ref_dict, ref_key, max_w=580, max_h=320):
         label.config(image="", text="（未找到对应裁剪图片）")
 
 
+_tk_root = None
+
+
+def _get_tk_root():
+    """全局唯一的 Tk 根窗口（隐藏），macOS 上复用，避免多次创建 Tk 导致窗口关不掉。"""
+    global _tk_root
+    if _tk_root is None:
+        import tkinter as tk
+        _tk_root = tk.Tk()
+        _tk_root.withdraw()
+    return _tk_root
+
+
 # --- 核对窗口 1：Ar1温度 ---
 
 def interactive_review_ar1_gui(data_rows_info, ar1_results, ar1_debug_map):
@@ -565,22 +593,28 @@ def interactive_review_ar1_gui(data_rows_info, ar1_results, ar1_debug_map):
     state = {'index': 0, 'confirmed': False}
     photo_refs = {}
 
-    root = tk.Tk()
-    root.title("91号文测温 - 核对 Ar1温度")
-    root.geometry("620x520")
-    root.attributes('-topmost', True)
+    if platform.system() == "Darwin":
+        root = _get_tk_root()
+        win = tk.Toplevel(root)
+    else:
+        win = tk.Tk()
+        root = win
 
-    info_label = tk.Label(root, text="", font=("PingFang SC", 14), justify="left", wraplength=580)
+    win.title("91号文测温 - 核对 Ar1温度")
+    win.geometry("620x520")
+    win.attributes('-topmost', True)
+
+    info_label = tk.Label(win, text="", font=("PingFang SC", 14), justify="left", wraplength=580)
     info_label.pack(pady=(15, 5))
 
-    img_label = tk.Label(root)
+    img_label = tk.Label(win)
     img_label.pack(pady=8)
 
     entry_var = tk.StringVar()
-    entry = tk.Entry(root, textvariable=entry_var, font=("PingFang SC", 22), justify="center", width=14)
+    entry = tk.Entry(win, textvariable=entry_var, font=("PingFang SC", 22), justify="center", width=14)
     entry.pack(pady=8)
 
-    hint_label = tk.Label(root, text="", font=("PingFang SC", 11), fg="gray")
+    hint_label = tk.Label(win, text="", font=("PingFang SC", 11), fg="gray")
     hint_label.pack(pady=(0, 5))
 
     btn_ref = {}
@@ -634,16 +668,35 @@ def interactive_review_ar1_gui(data_rows_info, ar1_results, ar1_debug_map):
         state['index'] += 1
         load_row(state['index'])
 
+    def _close():
+        # macOS 上先隐藏再销毁，再 update 处理待销毁事件，最后 quit 退出 mainloop
+        try:
+            win.withdraw()
+        except Exception:
+            pass
+        try:
+            win.destroy()
+        except Exception:
+            pass
+        try:
+            root.update()
+        except Exception:
+            pass
+        try:
+            root.quit()
+        except Exception:
+            pass
+
     def confirm_submit(event=None):
         if not try_save():
             return
         state['confirmed'] = True
-        root.destroy()
+        _close()
 
     def skip_rest():
-        root.destroy()
+        _close()
 
-    button_frame = tk.Frame(root)
+    button_frame = tk.Frame(win)
     button_frame.pack(pady=15)
     btn_ref['prev'] = tk.Button(button_frame, text="↑ 上一条", command=go_previous, width=10)
     btn_ref['prev'].grid(row=0, column=0, padx=4)
@@ -653,16 +706,21 @@ def interactive_review_ar1_gui(data_rows_info, ar1_results, ar1_debug_map):
     btn_ref['submit'].grid(row=0, column=2, padx=4)
     tk.Button(button_frame, text="跳过剩余核对", command=skip_rest, width=14).grid(row=0, column=3, padx=4)
 
-    root.bind('<Up>', go_previous)
-    root.bind('<Down>', go_next)
-    root.bind('<Return>', confirm_submit)
+    win.bind('<Up>', go_previous)
+    win.bind('<Down>', go_next)
+    win.bind('<Return>', confirm_submit)
 
     print("\n已打开【Ar1温度】核对窗口...")
     load_row(0)
-    root.lift()
-    root.focus_force()
+    win.lift()
+    win.focus_force()
     entry.focus_set()
-    root.mainloop()
+    win.mainloop()
+
+    try:
+        win.destroy()
+    except Exception:
+        pass
 
     if state['confirmed']:
         print("【Ar1温度】核对完成，用户已确认提交。")
@@ -709,28 +767,34 @@ def interactive_review_datetime_gui(data_rows_info, date_results, time_results, 
     state = {'index': 0, 'confirmed': False}
     photo_refs = {}
 
-    root = tk.Tk()
-    root.title("91号文测温 - 核对 拍摄日期+时间")
-    root.geometry("620x580")
-    root.attributes('-topmost', True)
+    if platform.system() == "Darwin":
+        root = _get_tk_root()
+        win = tk.Toplevel(root)
+    else:
+        win = tk.Tk()
+        root = win
 
-    info_label = tk.Label(root, text="", font=("PingFang SC", 14), justify="left", wraplength=580)
+    win.title("91号文测温 - 核对 拍摄日期+时间")
+    win.geometry("620x580")
+    win.attributes('-topmost', True)
+
+    info_label = tk.Label(win, text="", font=("PingFang SC", 14), justify="left", wraplength=580)
     info_label.pack(pady=(15, 5))
 
-    img_label = tk.Label(root)
+    img_label = tk.Label(win)
     img_label.pack(pady=6)
 
-    tk.Label(root, text="拍摄日期 (YYYY-MM-DD)", font=("PingFang SC", 11)).pack(pady=(8, 0))
+    tk.Label(win, text="拍摄日期 (YYYY-MM-DD)", font=("PingFang SC", 11)).pack(pady=(8, 0))
     date_var = tk.StringVar()
-    date_entry = tk.Entry(root, textvariable=date_var, font=("PingFang SC", 18), justify="center", width=18)
+    date_entry = tk.Entry(win, textvariable=date_var, font=("PingFang SC", 18), justify="center", width=18)
     date_entry.pack(pady=3)
 
-    tk.Label(root, text="拍摄时间 (HH:MM:SS)", font=("PingFang SC", 11)).pack(pady=(6, 0))
+    tk.Label(win, text="拍摄时间 (HH:MM:SS)", font=("PingFang SC", 11)).pack(pady=(6, 0))
     time_var = tk.StringVar()
-    time_entry = tk.Entry(root, textvariable=time_var, font=("PingFang SC", 18), justify="center", width=18)
+    time_entry = tk.Entry(win, textvariable=time_var, font=("PingFang SC", 18), justify="center", width=18)
     time_entry.pack(pady=3)
 
-    hint_label = tk.Label(root, text="", font=("PingFang SC", 11), fg="gray")
+    hint_label = tk.Label(win, text="", font=("PingFang SC", 11), fg="gray")
     hint_label.pack(pady=(6, 4))
 
     btn_ref = {}
@@ -789,16 +853,35 @@ def interactive_review_datetime_gui(data_rows_info, date_results, time_results, 
         state['index'] += 1
         load_row(state['index'])
 
+    def _close():
+        # macOS 上先隐藏再销毁，再 update 处理待销毁事件，最后 quit 退出 mainloop
+        try:
+            win.withdraw()
+        except Exception:
+            pass
+        try:
+            win.destroy()
+        except Exception:
+            pass
+        try:
+            root.update()
+        except Exception:
+            pass
+        try:
+            root.quit()
+        except Exception:
+            pass
+
     def confirm_submit(event=None):
         if not try_save():
             return
         state['confirmed'] = True
-        root.destroy()
+        _close()
 
     def skip_rest():
-        root.destroy()
+        _close()
 
-    button_frame = tk.Frame(root)
+    button_frame = tk.Frame(win)
     button_frame.pack(pady=12)
     btn_ref['prev'] = tk.Button(button_frame, text="↑ 上一条", command=go_previous, width=10)
     btn_ref['prev'].grid(row=0, column=0, padx=4)
@@ -808,16 +891,21 @@ def interactive_review_datetime_gui(data_rows_info, date_results, time_results, 
     btn_ref['submit'].grid(row=0, column=2, padx=4)
     tk.Button(button_frame, text="跳过剩余核对", command=skip_rest, width=14).grid(row=0, column=3, padx=4)
 
-    root.bind('<Up>', go_previous)
-    root.bind('<Down>', go_next)
-    root.bind('<Return>', confirm_submit)
+    win.bind('<Up>', go_previous)
+    win.bind('<Down>', go_next)
+    win.bind('<Return>', confirm_submit)
 
     print("\n已打开【拍摄日期+时间】核对窗口...")
     load_row(0)
-    root.lift()
-    root.focus_force()
+    win.lift()
+    win.focus_force()
     date_entry.focus_set()
-    root.mainloop()
+    win.mainloop()
+
+    try:
+        win.destroy()
+    except Exception:
+        pass
 
     if state['confirmed']:
         print("【拍摄日期+时间】核对完成，用户已确认提交。")
@@ -870,6 +958,215 @@ def _is_float(s):
 
 # ===================== Step 1：识别 + 核对 + 写入Excel =====================
 
+# ===================== 自动定位（温度框不固定） =====================
+
+def locate_label_and_wen(img):
+    """一次整图 OCR，定位数值锚点。
+
+    优先找"温"字（贴数值近、精度高）；找不到再回退找 R01/R02/R03 等测量点编号。
+    返回 (锚点box, 锚点类型'wen'/'ascii', 标签左边界x)；都找不到返回 (None, None, None)。
+    """
+    b, g, r = img[:, :, 0], img[:, :, 1], img[:, :, 2]
+    white = (b > 180) & (g > 180) & (r > 180)
+    mask = np.where(white, 0, 255).astype(np.uint8)
+    data = pytesseract.image_to_data(
+        mask, lang="chi_sim+eng", config="--psm 11", output_type=pytesseract.Output.DICT
+    )
+
+    frags = []
+    for i, t in enumerate(data["text"]):
+        t = t.strip()
+        if not t:
+            continue
+        frags.append((t, data["left"][i], data["top"][i], data["width"][i], data["height"][i]))
+
+    # 1. 优先找"温"标记
+    wen_box = None
+    for keyword in MARKER_KEYWORDS:
+        for (t, x, y, w, h) in frags:
+            if keyword in t:
+                wen_box = (x, y, w, h)
+                break
+        if wen_box is not None:
+            break
+
+    # 2. 找不到"温"，回退找 ASCII 测量点编号（R01/R02/R03 等）
+    ascii_box = None
+    if wen_box is None:
+        for (t, x, y, w, h) in frags:
+            if any(kw in t.upper() for kw in ASCII_MARKERS):
+                ascii_box = (x, y, w, h)
+                break
+
+    if wen_box is not None:
+        anchor, atype = wen_box, "wen"
+    elif ascii_box is not None:
+        anchor, atype = ascii_box, "ascii"
+    else:
+        return None, None, None
+
+    # 3. 找标签左边界（锚点左侧 250px 内、垂直方向重叠的文本最左）
+    ax, ay, aw, ah = anchor
+    label_left = ax
+    for (t, x, y, w, h) in frags:
+        if x < ax and ax - x < 250 and abs((y + h / 2) - (ay + ah / 2)) < ah * 2:
+            label_left = min(label_left, x)
+
+    return anchor, atype, label_left
+
+
+def extract_number_from_text(text):
+    """从OCR文本提取数值，优先带小数点（温度格式 XX.X，取 1 位小数）。"""
+    text = text.strip().replace("，", ".").replace(":", "").replace("：", "")
+    m = re.search(r"\d+\.\d", text)
+    if m:
+        return m.group(0)
+    m = re.search(r"\d+", text)
+    if m:
+        return m.group(0)
+    return None
+
+
+def ocr_number(crop):
+    """从数值小图（BGR）识别数字。优先白色文字分割，回退灰度多阈值。"""
+    b, g, r = crop[:, :, 0], crop[:, :, 1], crop[:, :, 2]
+    white = (b > 180) & (g > 180) & (r > 180)
+    if white.sum() > 0:
+        mask = np.where(white, 0, 255).astype(np.uint8)
+        big = cv2.resize(mask, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)
+        _, th = cv2.threshold(big, 127, 255, cv2.THRESH_BINARY)
+        txt = pytesseract.image_to_string(th, config="--psm 7 -c tessedit_char_whitelist=0123456789.")
+        val = extract_number_from_text(txt)
+        if val is not None:
+            return val
+
+    candidates = []
+    big = cv2.resize(crop, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)
+    g = cv2.cvtColor(big, cv2.COLOR_BGR2GRAY)
+    variants = []
+    _, th1 = cv2.threshold(g, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    variants.append(th1)
+    variants.append(cv2.bitwise_not(th1))
+    variants.append(cv2.adaptiveThreshold(g, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 10))
+
+    for v in variants:
+        txt = pytesseract.image_to_string(v, config="--psm 7 -c tessedit_char_whitelist=0123456789.")
+        val = extract_number_from_text(txt)
+        if val is not None:
+            if "." in val:
+                return val
+            candidates.append(val)
+
+    return candidates[0] if candidates else None
+
+
+def find_number_box(crop):
+    """在数值区域内定位数字的精确边界（白色连通域），去掉冒号、空白和右侧的"°C"等。"""
+    b, g, r = crop[:, :, 0], crop[:, :, 1], crop[:, :, 2]
+    white = ((b > 180) & (g > 180) & (r > 180)).astype(np.uint8)
+    if white.sum() == 0:
+        return None
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(white, connectivity=8)
+
+    comps = []
+    for i in range(1, n):
+        if stats[i, cv2.CC_STAT_AREA] < 15:
+            continue
+        l = stats[i, cv2.CC_STAT_LEFT]
+        t = stats[i, cv2.CC_STAT_TOP]
+        r = l + stats[i, cv2.CC_STAT_WIDTH]
+        btm = t + stats[i, cv2.CC_STAT_HEIGHT]
+        comps.append((l, t, r, btm))
+    if not comps:
+        return None
+
+    # 按 x 排序，从左往右扩展，遇到大间隙（>20px）停止
+    comps.sort(key=lambda c: c[0])
+    x0, y0, x1, y1 = comps[0]
+    for (l, t, r, btm) in comps[1:]:
+        if l - x1 > 20:
+            break
+        x0 = min(x0, l)
+        y0 = min(y0, t)
+        x1 = max(x1, r)
+        y1 = max(y1, btm)
+
+    m = 3
+    x0 = max(0, x0 - m)
+    y0 = max(0, y0 - m)
+    x1 = min(crop.shape[1], x1 + m)
+    y1 = min(crop.shape[0], y1 + m)
+    return (x0, y0, x1, y1)
+
+
+def crop_upper_half(img):
+    """裁剪图片上半部分，供无法识别时在核对框中人工识别。"""
+    return img[0:img.shape[0] // 2, :]
+
+
+def extract_max_temp(image_path):
+    """自动定位并提取最高温数值，返回 (数值字符串或None, 显示用裁剪图或None)。
+
+    识别用紧致数字框；显示用完整标签框；无法定位或识别不到时显示上半张。
+    """
+    img = imread_unicode(image_path)
+    if img is None:
+        return None, None
+
+    anchor, atype, label_left = locate_label_and_wen(img)
+    if anchor is None:
+        return None, crop_upper_half(img)
+
+    x, y, w, h = anchor
+
+    # --- 识别 ---
+    if atype == "wen":
+        # "温"贴数值近，裁一个窄区域再收紧到只含数字
+        x0 = max(0, x + w)
+        x1 = min(img.shape[1], x + w + 150)
+        y0 = max(0, y - 10)
+        y1 = min(img.shape[0], y + h + 10)
+        crop = img[y0:y1, x0:x1]
+        if crop.size == 0:
+            return None, crop_upper_half(img)
+        box = find_number_box(crop)
+        if box is not None:
+            bx0, by0, bx1, by1 = box
+            crop = crop[by0:by1, bx0:bx1]
+            val_right = x0 + bx1
+        else:
+            val_right = x1
+    else:
+        # "R01"在标签最左，数值在其右侧约 100~180px（要越过"最高温"），裁一个宽区域
+        x0 = max(0, x + w)
+        x1 = min(img.shape[1], x + w + 260)
+        y0 = max(0, y - 10)
+        y1 = min(img.shape[0], y + h + 10)
+        crop = img[y0:y1, x0:x1]
+        val_right = x1
+
+    if crop.size == 0:
+        return None, crop_upper_half(img)
+
+    value = ocr_number(crop)
+
+    # --- 显示 ---
+    if value is None:
+        # 识别不到数值，显示上半张图供人工识别
+        display = crop_upper_half(img)
+    else:
+        # 识别成功，显示完整标签"RO1 最高温：XX.X"
+        dx0 = max(0, label_left - 3)
+        dx1 = min(img.shape[1], val_right + 3)
+        dy0 = max(0, y - 12)
+        dy1 = min(img.shape[0], y + h + 12)
+        display_crop = img[dy0:dy1, dx0:dx1]
+        scale = max(3.0, 160.0 / max(1, display_crop.shape[0]))
+        display = cv2.resize(display_crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+
+    return value, display
+
+
 def step1_recognize_and_review(excel_output_path):
     print(f"\n{'=' * 50}")
     print("  Step 1: OCR识别 + 人工核对 + 写入Excel")
@@ -899,8 +1196,14 @@ def step1_recognize_and_review(excel_output_path):
         print("错误：没有可用的示例图片用于框选区域。")
         sys.exit(1)
 
-    ar1_roi = get_roi(sample_path, AR1_ROI_CONFIG_FILE, "温度（Ar1）数值",
-                       "框选温度(Ar1)区域 (Space/Enter确认, C取消)")
+    # 询问温度框是否不固定：y=自动定位，n=固定框手动框选
+    choice = input("是否温度框不固定？(y=不固定，自动定位 / n=固定，手动框选) [n]: ").strip().lower()
+    use_auto = choice in ("y", "yes")
+
+    ar1_roi = None
+    if not use_auto:
+        ar1_roi = get_roi(sample_path, AR1_ROI_CONFIG_FILE, "温度（Ar1）数值",
+                           "框选温度(Ar1)区域 (Space/Enter确认, C取消)")
 
     # ===== V3：时间标框改为可选 =====
     print()
@@ -938,7 +1241,12 @@ def step1_recognize_and_review(excel_output_path):
             print(f"[{i}/{len(data_rows_info)}] 设备: {info['device_name']}  ->  无对应图片")
             continue
 
-        ar1_val, ar1_crop, ar1_raw = ocr_ar1_temperature(img_path, ar1_roi)
+        if use_auto:
+            ar1_val, ar1_display = extract_max_temp(img_path)
+            ar1_crop = ar1_display
+            ar1_raw = []
+        else:
+            ar1_val, ar1_crop, ar1_raw = ocr_ar1_temperature(img_path, ar1_roi)
 
         if has_datetime:
             date_val, time_val, dt_crop, dt_raw = ocr_datetime(img_path, datetime_roi)
@@ -977,40 +1285,69 @@ def step1_recognize_and_review(excel_output_path):
                 cv2.imwrite(path, save_img)
                 dt_debug_map[r] = path
 
-    if has_datetime:
-        fail_count = sum(
-            1 for info in data_rows_info
-            if ar1_results.get(info['row']) is None
-            or date_results.get(info['row']) is None
-            or time_results.get(info['row']) is None
-        )
-    else:
-        fail_count = sum(
-            1 for info in data_rows_info
-            if ar1_results.get(info['row']) is None
-        )
-    do_review = True
-    if fail_count == 0:
-        print(f"\n本次 {len(data_rows_info)} 行全部识别成功。")
-        choice = input("是否仍要逐张人工核对确认？(y=核对 / n=跳过，直接使用识别结果) [n]: ").strip().lower()
-        do_review = choice in ("y", "yes")
-    else:
-        print(f"\n共有 {fail_count} / {len(data_rows_info)} 行存在识别失败的内容，需要人工核对补充。")
+    # 判断某行是否识别失败（Ar1温度缺失，或选择了日期时间时日期/时间缺失）
+    def is_failed_row(info):
+        r = info['row']
+        if ar1_results.get(r) is None:
+            return True
+        if has_datetime and (date_results.get(r) is None or time_results.get(r) is None):
+            return True
+        return False
 
-    if do_review:
+    fail_count = sum(1 for info in data_rows_info if is_failed_row(info))
+
+    # 人工核对：有失败时先填充失败的，再询问剩下的；全部成功则询问是否核对
+    if fail_count > 0:
+        print(f"\n共有 {fail_count} / {len(data_rows_info)} 行存在识别失败的内容，先人工填充这些数值。")
+        failed_rows_info = [info for info in data_rows_info if is_failed_row(info)]
+        remaining_rows_info = [info for info in data_rows_info if not is_failed_row(info)]
+
         if USE_GUI:
-            ar1_results = interactive_review_ar1_gui(data_rows_info, ar1_results, ar1_debug_map)
+            ar1_results = interactive_review_ar1_gui(failed_rows_info, ar1_results, ar1_debug_map)
             if has_datetime:
                 date_results, time_results = interactive_review_datetime_gui(
-                    data_rows_info, date_results, time_results, dt_debug_map
+                    failed_rows_info, date_results, time_results, dt_debug_map
                 )
         else:
             print("\n（已启用 --cli 模式，使用命令行核对）")
-            ar1_results = interactive_review_ar1_cli(data_rows_info, ar1_results, ar1_debug_map)
+            ar1_results = interactive_review_ar1_cli(failed_rows_info, ar1_results, ar1_debug_map)
             if has_datetime:
                 date_results, time_results = interactive_review_datetime_cli(
-                    data_rows_info, date_results, time_results, dt_debug_map
+                    failed_rows_info, date_results, time_results, dt_debug_map
                 )
+
+        if remaining_rows_info:
+            choice = input(f"\n是否对剩下 {len(remaining_rows_info)} 张已识别的图片进行人工核对？(y=核对 / n=跳过) [n]: ").strip().lower()
+            if choice in ("y", "yes"):
+                if USE_GUI:
+                    ar1_results = interactive_review_ar1_gui(remaining_rows_info, ar1_results, ar1_debug_map)
+                    if has_datetime:
+                        date_results, time_results = interactive_review_datetime_gui(
+                            remaining_rows_info, date_results, time_results, dt_debug_map
+                        )
+                else:
+                    ar1_results = interactive_review_ar1_cli(remaining_rows_info, ar1_results, ar1_debug_map)
+                    if has_datetime:
+                        date_results, time_results = interactive_review_datetime_cli(
+                            remaining_rows_info, date_results, time_results, dt_debug_map
+                        )
+    else:
+        print(f"\n本次 {len(data_rows_info)} 行全部识别成功。")
+        choice = input("是否仍要逐张人工核对确认？(y=核对 / n=跳过，直接使用识别结果) [n]: ").strip().lower()
+        if choice in ("y", "yes"):
+            if USE_GUI:
+                ar1_results = interactive_review_ar1_gui(data_rows_info, ar1_results, ar1_debug_map)
+                if has_datetime:
+                    date_results, time_results = interactive_review_datetime_gui(
+                        data_rows_info, date_results, time_results, dt_debug_map
+                    )
+            else:
+                print("\n（已启用 --cli 模式，使用命令行核对）")
+                ar1_results = interactive_review_ar1_cli(data_rows_info, ar1_results, ar1_debug_map)
+                if has_datetime:
+                    date_results, time_results = interactive_review_datetime_cli(
+                        data_rows_info, date_results, time_results, dt_debug_map
+                    )
 
     # 写回Excel
     for info in data_rows_info:
@@ -1263,12 +1600,10 @@ def main():
         suffix = None
 
     # ---------- GUI 预初始化（仅 macOS 需要，Windows 上反而会破坏 Tcl 解释器）----------
+    # 用单例根窗口（创建后保持隐藏，供核对窗口复用），避免多次创建 Tk 导致关不掉
     if USE_GUI and run_step1 and platform.system() == "Darwin":
         try:
-            import tkinter as tk
-            _pre = tk.Tk()
-            _pre.withdraw()
-            _pre.destroy()
+            _get_tk_root()
         except Exception:
             pass
 

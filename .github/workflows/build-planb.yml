@@ -41,11 +41,11 @@ jobs:
 
       - name: 打包 PlanB-91号文
         run: |
-          pyinstaller --onefile --name "91号文报告自动生成" "PlanB_分路径/Document_91/1_program/91号文红外测温报告自动生成v2.py"
+          pyinstaller --onefile --name "91号文报告自动生成" "PlanB_分路径/Document_91/1_program/91号文红外测温报告自动生成v3.py"
 
       - name: 打包 PlanB-43号文
         run: |
-          pyinstaller --onefile --name "43号文红外测温报告自动生成" "PlanB_分路径/Document_43/1_program/43号文红外测温报告自动生成v2.py"
+          pyinstaller --onefile --name "43号文红外测温报告自动生成" "PlanB_分路径/Document_43/1_program/43号文红外测温报告自动生成v4.py"
 
       - name: 打包 PlanB-测温记录
         run: |
